@@ -26,10 +26,17 @@ public:
 
     RCLCPP_INFO(LOGGER, "PickPlaceNode is ready and waiting for messages on "
                         "'pick_place_topic'.");
+
+    // Initialize the PlanningSceneInterface here or wherever is convenient
+    planning_scene_interface_ =
+        std::make_shared<moveit::planning_interface::PlanningSceneInterface>();
+
+    // Add the table box to the planning scene
+    add_table_collision();
   }
 
   void initialize_move_groups() {
-    // Initializing MoveGroupInterfaces after node construction
+    // Initialize MoveGroupInterfaces
     move_group_ =
         std::make_shared<moveit::planning_interface::MoveGroupInterface>(
             shared_from_this(), PLANNING_GROUP);
@@ -39,6 +46,39 @@ public:
   }
 
 private:
+  void add_table_collision() {
+    // Creating a collision object
+    moveit_msgs::msg::CollisionObject table_object;
+    table_object.id = "table";
+    table_object.header.frame_id = "base_link";
+
+    // Defining the primitive
+    shape_msgs::msg::SolidPrimitive table_primitive;
+    table_primitive.type = table_primitive.BOX;
+    table_primitive.dimensions.resize(3);
+    table_primitive.dimensions[0] = 1.0;  // X dimension
+    table_primitive.dimensions[1] = 1.0;  // Y dimension
+    table_primitive.dimensions[2] = 0.05; // Z dimension
+
+    // Defining the pose of the table
+    geometry_msgs::msg::Pose table_pose;
+    table_pose.orientation.w = 1.0; // No rotation
+    table_pose.position.x = 0.0;
+    table_pose.position.y = 0.0;
+    table_pose.position.z = -0.05 / 2.0;
+
+    table_object.primitives.push_back(table_primitive);
+    table_object.primitive_poses.push_back(table_pose);
+    table_object.operation = table_object.ADD;
+
+    // Adding this object to the planning scene
+    std::vector<moveit_msgs::msg::CollisionObject> collision_objects;
+    collision_objects.push_back(table_object);
+    planning_scene_interface_->addCollisionObjects(collision_objects);
+
+    RCLCPP_INFO(LOGGER, "Added 'table' collision object to the world.");
+  }
+
   void pick_place_callback(
       const moveit2_scripts::msg::PickPlacePoses::SharedPtr msg) {
     RCLCPP_INFO(LOGGER, "Received a new pick-and-place request!");
@@ -74,15 +114,15 @@ private:
       move_group_gripper_->execute(gripper_plan);
       RCLCPP_INFO(LOGGER, "Gripper opened.");
     } else {
-      RCLCPP_WARN(LOGGER, "Failed to close gripper.");
+      RCLCPP_WARN(LOGGER, "Failed to open gripper.");
     }
 
-    // Cartesian Approach
+    // Cartesian approach
     std::vector<geometry_msgs::msg::Pose> approach_waypoints;
-    // Move down 5 cm
+    // Moving down 5 cm
     pick_pose.position.z -= 0.05;
     approach_waypoints.push_back(pick_pose);
-    // Move down another 5 cm
+    // Moving down another 5 cm
     pick_pose.position.z -= 0.05;
     approach_waypoints.push_back(pick_pose);
 
@@ -100,7 +140,7 @@ private:
                   fraction);
     }
 
-    // Closing the Gripper
+    // Closing the gripper
     move_group_gripper_->setNamedTarget("close_gripper");
     success = (move_group_gripper_->plan(gripper_plan) ==
                moveit::core::MoveItErrorCode::SUCCESS);
@@ -131,7 +171,7 @@ private:
                   fraction);
     }
 
-    // Moving Arm to the Place Pose
+    // Moving arm to the place pose
     move_group_->setPoseTarget(place_pose);
     success =
         (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
@@ -143,7 +183,7 @@ private:
       return;
     }
 
-    // Opening the Gripper
+    // Opening the gripper
     move_group_gripper_->setNamedTarget("open_gripper");
     success = (move_group_gripper_->plan(gripper_plan) ==
                moveit::core::MoveItErrorCode::SUCCESS);
@@ -160,6 +200,8 @@ private:
 
   rclcpp::Subscription<moveit2_scripts::msg::PickPlacePoses>::SharedPtr
       pick_place_sub_;
+  std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
+      planning_scene_interface_;
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface> move_group_;
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface>
       move_group_gripper_;
