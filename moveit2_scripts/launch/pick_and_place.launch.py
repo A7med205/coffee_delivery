@@ -4,7 +4,7 @@ from launch_ros.actions import Node
 from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
-    moveit_config = MoveItConfigsBuilder("name", package_name="my_moveit_config").to_moveit_configs()
+    moveit_config = MoveItConfigsBuilder("name", package_name="moveit_config").to_moveit_configs()
 
     # MoveItCpp demo executable
     moveit_cpp_node = Node(
