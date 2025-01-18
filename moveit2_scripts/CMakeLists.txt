@@ -16,27 +16,28 @@ find_package(interactive_markers REQUIRED)
 find_package(geometric_shapes REQUIRED)
 find_package(control_msgs REQUIRED)
 find_package(moveit_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+set(msg_files
+  "msg/PickPlacePoses.msg"
+)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${msg_files}
+  DEPENDENCIES geometry_msgs
+)
+
+ament_export_dependencies(rosidl_default_runtime)
 
 # Generate the executable
 add_executable(pick_and_place
     src/pick_and_place.cpp)
+
 target_include_directories(pick_and_place
     PUBLIC include)
-ament_target_dependencies(pick_and_place
-    ament_cmake
-	rclcpp
-	rclcpp_action
-	moveit_core
-	moveit_ros_planning_interface
-	interactive_markers
-	moveit_ros_planning
-	control_msgs)
 
-add_executable(real_pick_and_place
-    src/real_pick_and_place.cpp)
-target_include_directories(real_pick_and_place
-    PUBLIC include)
-ament_target_dependencies(real_pick_and_place
+ament_target_dependencies(pick_and_place
     ament_cmake
 	rclcpp
 	rclcpp_action
@@ -49,9 +50,12 @@ ament_target_dependencies(real_pick_and_place
 # Install the executable
 install(TARGETS 
 	pick_and_place
-	real_pick_and_place
     DESTINATION lib/${PROJECT_NAME}
 )
+
+rosidl_target_interfaces(pick_and_place
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 
 # Install the launch file
 install(DIRECTORY 

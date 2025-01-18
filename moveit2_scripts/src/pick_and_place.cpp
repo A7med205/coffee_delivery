@@ -4,26 +4,20 @@
 #include <moveit_msgs/msg/display_trajectory.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+// Custom message header
+#include <moveit2_scripts/msg/pick_place_poses.hpp>
 
-// Custom message header (replace with your actual path/package name)
-#include <my_robot_msgs/msg/pick_place_poses.hpp>
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("pick_place_node");
 
-static const rclcpp::Logger LOGGER =
-    rclcpp::get_logger("pick_place_subscriber");
-
-// Hard-coded planning group names
+// Planning group names
 static const std::string PLANNING_GROUP = "manipulator";
 static const std::string PLANNING_GROUP_GRIPPER = "gripper";
 
-/**
- * @class PickPlaceNode
- * @brief Subscribes to PickPlacePoses and performs pick-and-place using MoveIt
- */
 class PickPlaceNode : public rclcpp::Node {
 public:
   PickPlaceNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
-      : Node("pick_place_subscriber_node", options) {
-    // 1. Create MoveGroupInterfaces for arm and gripper
+      : Node("pick_place_node", options) {
+    // MoveGroupInterfaces for arm and gripper
     move_group_ =
         std::make_shared<moveit::planning_interface::MoveGroupInterface>(
             shared_from_this(), PLANNING_GROUP);
@@ -31,9 +25,9 @@ public:
         std::make_shared<moveit::planning_interface::MoveGroupInterface>(
             shared_from_this(), PLANNING_GROUP_GRIPPER);
 
-    // 2. Create a subscription to receive pick & place poses
+    // Subscription to receive pick & place poses
     pick_place_sub_ =
-        this->create_subscription<my_robot_msgs::msg::PickPlacePoses>(
+        this->create_subscription<moveit2_scripts::msg::PickPlacePoses>(
             "pick_place_topic", // Topic name
             10,                 // Queue size
             std::bind(&PickPlaceNode::pickPlaceCallback, this,
@@ -44,24 +38,19 @@ public:
   }
 
 private:
-  /**
-   * @brief Callback that runs each time we receive pick/place poses.
-   */
   void
-  pickPlaceCallback(const my_robot_msgs::msg::PickPlacePoses::SharedPtr msg) {
+  pickPlaceCallback(const moveit2_scripts::msg::PickPlacePoses::SharedPtr msg) {
     RCLCPP_INFO(LOGGER, "Received a new pick-and-place request!");
 
-    // Extract pick and place poses from the message
+    // Extracting pick and place poses from the message
     geometry_msgs::msg::Pose pick_pose = msg->pick_pose;
     geometry_msgs::msg::Pose place_pose = msg->place_pose;
 
-    // Ensure the current state is our start state
+    // Ensuring the current state is our start state
     move_group_gripper_->setStartStateToCurrentState();
     move_group_->setStartStateToCurrentState();
 
-    // ---------------------------------------------------
-    // 1) Move Arm to the Pick Pose
-    // ---------------------------------------------------
+    // Moving Arm to the Pick Pose
     move_group_->setPoseTarget(pick_pose);
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     bool success =
@@ -75,9 +64,7 @@ private:
       return;
     }
 
-    // ---------------------------------------------------
-    // 2) Cartesian Approach (optional example)
-    // ---------------------------------------------------
+    // Cartesian Approach
     std::vector<geometry_msgs::msg::Pose> approach_waypoints;
     // Move down 5 cm
     pick_pose.position.z -= 0.05;
@@ -100,9 +87,7 @@ private:
                   fraction);
     }
 
-    // ---------------------------------------------------
-    // 3) Close the Gripper
-    // ---------------------------------------------------
+    // Closing the Gripper
     move_group_gripper_->setNamedTarget("0_60");
     moveit::planning_interface::MoveGroupInterface::Plan gripper_plan;
     success = (move_group_gripper_->plan(gripper_plan) ==
@@ -115,9 +100,7 @@ private:
       RCLCPP_WARN(LOGGER, "Failed to close gripper.");
     }
 
-    // ---------------------------------------------------
-    // 4) Retreat
-    // ---------------------------------------------------
+    // Retreating
     std::vector<geometry_msgs::msg::Pose> retreat_waypoints;
     pick_pose.position.z += 0.05;
     retreat_waypoints.push_back(pick_pose);
@@ -136,9 +119,7 @@ private:
                   fraction);
     }
 
-    // ---------------------------------------------------
-    // 5) Move Arm to the Place Pose
-    // ---------------------------------------------------
+    // Moving Arm to the Place Pose
     move_group_->setPoseTarget(place_pose);
     success =
         (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
@@ -150,9 +131,7 @@ private:
       return;
     }
 
-    // ---------------------------------------------------
-    // 6) Open the Gripper
-    // ---------------------------------------------------
+    // Opening the Gripper
     move_group_gripper_->setNamedTarget("open_gripper");
     success = (move_group_gripper_->plan(gripper_plan) ==
                moveit::core::MoveItErrorCode::SUCCESS);
@@ -167,24 +146,17 @@ private:
     RCLCPP_INFO(LOGGER, "Pick-and-place sequence completed!");
   }
 
-  // Subscriptions
-  rclcpp::Subscription<my_robot_msgs::msg::PickPlacePoses>::SharedPtr
+  rclcpp::Subscription<moveit2_scripts::msg::PickPlacePoses>::SharedPtr
       pick_place_sub_;
-
-  // MoveIt interfaces
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface> move_group_;
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface>
       move_group_gripper_;
 };
 
 int main(int argc, char **argv) {
-  // Initialize ROS 2
   rclcpp::init(argc, argv);
-
-  // Create node (and spin to receive messages)
   auto node = std::make_shared<PickPlaceNode>();
   rclcpp::spin(node);
-
   rclcpp::shutdown();
   return 0;
 }
