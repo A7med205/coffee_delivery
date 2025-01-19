@@ -47,33 +47,48 @@ public:
 
 private:
   void add_table_collision() {
-    // Creating a collision object
-    moveit_msgs::msg::CollisionObject table_object;
+    // Creating collision objects
+    moveit_msgs::msg::CollisionObject table_object, coffee_machine;
     table_object.id = "table";
     table_object.header.frame_id = "base_link";
+    coffee_machine.id = "machine";
+    coffee_machine.header.frame_id = "base_link";
 
-    // Defining the primitive
-    shape_msgs::msg::SolidPrimitive table_primitive;
+    // Defining primitives
+    shape_msgs::msg::SolidPrimitive table_primitive, machine_primitive;
     table_primitive.type = table_primitive.BOX;
     table_primitive.dimensions.resize(3);
-    table_primitive.dimensions[0] = 1.0;  // X dimension
-    table_primitive.dimensions[1] = 1.0;  // Y dimension
+    table_primitive.dimensions[0] = 0.85; // X dimension
+    table_primitive.dimensions[1] = 1.81; // Y dimension
     table_primitive.dimensions[2] = 0.05; // Z dimension
+    machine_primitive.type = machine_primitive.BOX;
+    machine_primitive.dimensions.resize(3);
+    machine_primitive.dimensions[0] = 0.65; // X dimension
+    machine_primitive.dimensions[1] = 0.20; // Y dimension
+    machine_primitive.dimensions[2] = 0.55; // Z dimension
 
     // Defining the pose of the table
-    geometry_msgs::msg::Pose table_pose;
+    geometry_msgs::msg::Pose table_pose, machine_pose;
     table_pose.orientation.w = 1.0; // No rotation
-    table_pose.position.x = 0.0;
-    table_pose.position.y = 0.0;
+    table_pose.position.x = 0.3;
+    table_pose.position.y = 0.36;
     table_pose.position.z = -0.05 / 2.0;
+    machine_pose.orientation.w = 1.0; // No rotation
+    machine_pose.position.x = 0.3;
+    machine_pose.position.y = 0.828;
+    machine_pose.position.z = 0.225;
 
     table_object.primitives.push_back(table_primitive);
     table_object.primitive_poses.push_back(table_pose);
     table_object.operation = table_object.ADD;
+    coffee_machine.primitives.push_back(machine_primitive);
+    coffee_machine.primitive_poses.push_back(machine_pose);
+    coffee_machine.operation = coffee_machine.ADD;
 
-    // Adding this object to the planning scene
+    // Adding objects to the planning scene
     std::vector<moveit_msgs::msg::CollisionObject> collision_objects;
     collision_objects.push_back(table_object);
+    collision_objects.push_back(coffee_machine);
     planning_scene_interface_->addCollisionObjects(collision_objects);
 
     RCLCPP_INFO(LOGGER, "Added 'table' collision object to the world.");
