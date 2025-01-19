@@ -72,7 +72,7 @@ private:
     table_pose.orientation.w = 1.0; // No rotation
     table_pose.position.x = 0.3;
     table_pose.position.y = 0.36;
-    table_pose.position.z = -0.05 / 2.0;
+    table_pose.position.z = -0.05 / 2.0 - 0.005;
     machine_pose.orientation.w = 1.0; // No rotation
     machine_pose.position.x = 0.3;
     machine_pose.position.y = 0.828;
@@ -186,16 +186,16 @@ private:
                   fraction);
     }
 
-    // Moving arm to the place pose
     move_group_->setPoseTarget(place_pose);
     success =
         (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
     if (success) {
       move_group_->execute(plan);
       RCLCPP_INFO(LOGGER, "Arm moved to place pose.");
     } else {
-      RCLCPP_WARN(LOGGER, "Failed to plan to place pose.");
-      return;
+      RCLCPP_WARN(LOGGER,
+                  "Failed to plan to place pose with orientation constraint.");
     }
 
     // Opening the gripper
@@ -208,6 +208,18 @@ private:
       RCLCPP_INFO(LOGGER, "Gripper opened.");
     } else {
       RCLCPP_WARN(LOGGER, "Failed to open gripper.");
+    }
+
+    // Returning to home
+    move_group_->setNamedTarget("home");
+    success =
+        (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
+    if (success) {
+      move_group_->execute(plan);
+      RCLCPP_INFO(LOGGER, "Returned to home.");
+    } else {
+      RCLCPP_WARN(LOGGER, "Failed to return to home.");
     }
 
     RCLCPP_INFO(LOGGER, "Pick-and-place sequence completed!");
