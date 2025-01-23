@@ -7,7 +7,9 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
@@ -56,10 +58,17 @@ install(TARGETS
 rosidl_target_interfaces(pick_and_place
   ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
+# Python node
+install(
+  PROGRAMS
+    scripts/slot_detector.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 # Install the launch file
 install(DIRECTORY 
 	launch
+	scripts
     DESTINATION share/${PROJECT_NAME}
 )
 
