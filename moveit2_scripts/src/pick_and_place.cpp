@@ -186,6 +186,29 @@ private:
                   fraction);
     }
 
+    // Moving arm to intermediatery pose
+    geometry_msgs::msg::Pose intermediatery_pose;
+    intermediatery_pose.position.x = -0.334;
+    intermediatery_pose.position.y = 0.057;
+    intermediatery_pose.position.z = 0.403;
+    intermediatery_pose.orientation.x = 1.0;
+    intermediatery_pose.orientation.y = 0.0;
+    intermediatery_pose.orientation.z = 0.0;
+    intermediatery_pose.orientation.w = 0.0;
+
+    // Set the intermediatery pose as the target
+    move_group_->setPoseTarget(intermediatery_pose);
+    success =
+        (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
+    if (success) {
+      move_group_->execute(plan);
+      RCLCPP_INFO(LOGGER, "Arm moved to intermediatery pose.");
+    } else {
+      RCLCPP_WARN(LOGGER, "Failed to plan to intermediatery pose.");
+    }
+
+    // Moving arm to the place pose
     move_group_->setPoseTarget(place_pose);
     success =
         (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
@@ -194,8 +217,7 @@ private:
       move_group_->execute(plan);
       RCLCPP_INFO(LOGGER, "Arm moved to place pose.");
     } else {
-      RCLCPP_WARN(LOGGER,
-                  "Failed to plan to place pose with orientation constraint.");
+      RCLCPP_WARN(LOGGER, "Failed to plan to place pose.");
     }
 
     // Opening the gripper
