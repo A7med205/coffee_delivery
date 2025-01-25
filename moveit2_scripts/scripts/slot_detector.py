@@ -2,6 +2,10 @@
 
 import rclpy
 from rclpy.node import Node
+import tf2_ros
+from geometry_msgs.msg import PointStamped
+import tf2_geometry_msgs
+from rclpy.duration import Duration
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
@@ -11,6 +15,10 @@ import math
 class TableSlotDetector(Node):
     def __init__(self):
         super().__init__('table_slot_detector')
+
+        # For the TF
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         
         # Subscriptions
         self.camera_info_sub = self.create_subscription(
@@ -71,8 +79,7 @@ class TableSlotDetector(Node):
 
     def depth_callback(self, msg):
         try:
-            # Depending on your camera output, might be 16UC1 or 32FC1
-            self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='16UC1')
         except CvBridgeError as e:
             self.get_logger().error(f"CV Bridge Error (Depth): {e}")
             return
@@ -129,6 +136,7 @@ class TableSlotDetector(Node):
                 if (0 <= px < self.depth_image.shape[1] and 
                     0 <= py < self.depth_image.shape[0]):
                     Z = self.depth_image[py, px]
+                    Z = float(Z) / 1000.0 # Converting to meters
 
                     # Checking if depth is valid
                     if Z > 0 and not np.isnan(Z):
@@ -150,6 +158,24 @@ class TableSlotDetector(Node):
                 f"axes=({major_axis:.2f}, {minor_axis:.2f}), angle={angle:.2f} deg "
                 f"-> 3D coords=({X:.3f}, {Y:.3f}, {Z:.3f})"
             )
+
+            # Converting to the arm's frame
+            camera_point = PointStamped()
+            camera_point.header.frame_id = 'D415_link'
+            camera_point.header.stamp = self.get_clock().now().to_msg()
+            camera_point.point.x = X
+            camera_point.point.y = Y
+            camera_point.point.z = Z
+
+            try:
+                base_point = self.tf_buffer.transform(camera_point, 'base_link', timeout=Duration(seconds=1.0))
+                X_base = base_point.point.x
+                Y_base = base_point.point.y
+                Z_base = base_point.point.z
+
+                self.get_logger().info(f"-> base_link coords=({X_base:.3f}, {Y_base:.3f}, {Z_base:.3f})")
+            except Exception as e:
+                self.get_logger().warn(f"Transform from D415_link to base_link failed: {e}")
 
         # Visualization
         cv2.imshow("Ellipse Detection", color_img)
