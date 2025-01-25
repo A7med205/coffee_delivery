@@ -13,8 +13,8 @@ joint_limits:
     max_velocity: 3.1415926535897931
     has_acceleration_limits: false
     max_acceleration: 0
-    min_position: -1.8
-    max_position: 1.8
+    min_position: -3.0
+    max_position: 0.75
   rg2_gripper_finger_left_joint:
     has_velocity_limits: true
     max_velocity: 0.59999999999999998
@@ -47,22 +47,22 @@ joint_limits:
     max_velocity: 3.1415926535897931
     has_acceleration_limits: false
     max_acceleration: 0
-    min_position: -1.00
-    max_position: 3.20
+    min_position: -3.6
+    max_position: 1.0
   wrist_1_joint:
     has_velocity_limits: true
     max_velocity: 6.2831853071795862
     has_acceleration_limits: false
     max_acceleration: 0
     min_position: -3.14
-    max_position: -0.5
+    max_position: 0.86
   wrist_2_joint:
     has_velocity_limits: true
     max_velocity: 6.2831853071795862
     has_acceleration_limits: false
     max_acceleration: 0
-    min_position: -2.0
-    max_position: 0.5
+    min_position: -0.5
+    max_position: 2.0
   wrist_3_joint:
     has_velocity_limits: true
     max_velocity: 6.2831853071795862

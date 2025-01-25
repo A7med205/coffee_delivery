@@ -120,7 +120,7 @@ private:
     }
 
     // Opening the Gripper
-    move_group_gripper_->setNamedTarget("open_gripper");
+    /*move_group_gripper_->setNamedTarget("open_gripper");
     moveit::planning_interface::MoveGroupInterface::Plan gripper_plan;
     success = (move_group_gripper_->plan(gripper_plan) ==
                moveit::core::MoveItErrorCode::SUCCESS);
@@ -130,7 +130,7 @@ private:
       RCLCPP_INFO(LOGGER, "Gripper opened.");
     } else {
       RCLCPP_WARN(LOGGER, "Failed to open gripper.");
-    }
+    }*/
 
     // Cartesian approach
     std::vector<geometry_msgs::msg::Pose> approach_waypoints;
@@ -156,7 +156,7 @@ private:
     }
 
     // Closing the gripper
-    move_group_gripper_->setNamedTarget("close_gripper");
+    /*move_group_gripper_->setNamedTarget("close_gripper");
     success = (move_group_gripper_->plan(gripper_plan) ==
                moveit::core::MoveItErrorCode::SUCCESS);
 
@@ -165,7 +165,7 @@ private:
       RCLCPP_INFO(LOGGER, "Gripper closed.");
     } else {
       RCLCPP_WARN(LOGGER, "Failed to close gripper.");
-    }
+    }*/
 
     // Retreating
     std::vector<geometry_msgs::msg::Pose> retreat_waypoints;
@@ -221,7 +221,7 @@ private:
     }
 
     // Opening the gripper
-    move_group_gripper_->setNamedTarget("open_gripper");
+    /* move_group_gripper_->setNamedTarget("open_gripper");
     success = (move_group_gripper_->plan(gripper_plan) ==
                moveit::core::MoveItErrorCode::SUCCESS);
 
@@ -230,10 +230,10 @@ private:
       RCLCPP_INFO(LOGGER, "Gripper opened.");
     } else {
       RCLCPP_WARN(LOGGER, "Failed to open gripper.");
-    }
+    }*/
 
     // Returning to home
-    move_group_->setNamedTarget("home");
+    /*move_group_->setNamedTarget("home");
     success =
         (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
 
@@ -242,7 +242,7 @@ private:
       RCLCPP_INFO(LOGGER, "Returned to home.");
     } else {
       RCLCPP_WARN(LOGGER, "Failed to return to home.");
-    }
+    } */
 
     RCLCPP_INFO(LOGGER, "Pick-and-place sequence completed!");
   }

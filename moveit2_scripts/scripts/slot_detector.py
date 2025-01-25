@@ -72,7 +72,7 @@ class TableSlotDetector(Node):
 
     def color_callback(self, msg):
         try:
-            self.color_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            self.color_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='rgb8')
         except CvBridgeError as e:
             self.get_logger().error(f"CV Bridge Error (Color): {e}")
             return
@@ -161,7 +161,7 @@ class TableSlotDetector(Node):
 
             # Converting to the arm's frame
             camera_point = PointStamped()
-            camera_point.header.frame_id = 'D415_link'
+            camera_point.header.frame_id = 'D415_color_optical_frame'
             camera_point.header.stamp = self.get_clock().now().to_msg()
             camera_point.point.x = X
             camera_point.point.y = Y
