@@ -106,9 +106,9 @@ private:
     move_group_->setStartStateToCurrentState();
 
     // Moving Arm to the Pick Pose
-    move_group_->setPoseTarget(pick_pose);
+    // move_group_->setPoseTarget(pick_pose);
     moveit::planning_interface::MoveGroupInterface::Plan plan;
-    bool success =
+    /* bool success =
         (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
 
     if (success) {
@@ -117,7 +117,7 @@ private:
     } else {
       RCLCPP_WARN(LOGGER, "Failed to plan to pick pose.");
       return;
-    }
+    }*/
 
     // Opening the Gripper
     /*move_group_gripper_->setNamedTarget("open_gripper");
@@ -133,12 +133,12 @@ private:
     }*/
 
     // Cartesian approach
-    std::vector<geometry_msgs::msg::Pose> approach_waypoints;
-    // Moving down 5 cm
-    pick_pose.position.z -= 0.05;
+    /*std::vector<geometry_msgs::msg::Pose> approach_waypoints;
+    // Moving down 4 cm
+    pick_pose.position.z -= 0.04;
     approach_waypoints.push_back(pick_pose);
-    // Moving down another 5 cm
-    pick_pose.position.z -= 0.05;
+    // Moving down another 4 cm
+    pick_pose.position.z -= 0.04;
     approach_waypoints.push_back(pick_pose);
 
     moveit_msgs::msg::RobotTrajectory approach_trajectory;
@@ -153,7 +153,7 @@ private:
     } else {
       RCLCPP_WARN(LOGGER, "Approach path failed or partial. Fraction = %.2f",
                   fraction);
-    }
+    }*/
 
     // Closing the gripper
     /*move_group_gripper_->setNamedTarget("close_gripper");
@@ -168,10 +168,10 @@ private:
     }*/
 
     // Retreating
-    std::vector<geometry_msgs::msg::Pose> retreat_waypoints;
-    pick_pose.position.z += 0.05;
+    /* std::vector<geometry_msgs::msg::Pose> retreat_waypoints;
+    pick_pose.position.z += 0.04;
     retreat_waypoints.push_back(pick_pose);
-    pick_pose.position.z += 0.05;
+    pick_pose.position.z += 0.04;
     retreat_waypoints.push_back(pick_pose);
 
     moveit_msgs::msg::RobotTrajectory retreat_trajectory;
@@ -184,7 +184,7 @@ private:
     } else {
       RCLCPP_WARN(LOGGER, "Retreat path failed or partial. Fraction = %.2f",
                   fraction);
-    }
+    }*/
 
     // Moving arm to intermediatery pose
     geometry_msgs::msg::Pose intermediatery_pose;
@@ -198,7 +198,7 @@ private:
 
     // Set the intermediatery pose as the target
     move_group_->setPoseTarget(intermediatery_pose);
-    success =
+    bool success =
         (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
 
     if (success) {
