@@ -113,10 +113,12 @@
                     <div class="card-body">
                         <div class="d-grid gap-2 mb-3">
                             <!-- Command Buttons -->
-                            <button id="start-system" class="btn btn-primary" @click="publishCommand(1)">
+                            <button id="start-system" class="btn btn-primary" @click="publishCommand(1)"
+                                :disabled="currentStateVal !== 1">
                                 Start Detection
                             </button>
-                            <button id="placement" class="btn btn-success" @click="publishCommand(2)">
+                            <button id="placement" class="btn btn-success" @click="publishCommand(2)"
+                                :disabled="currentStateVal !== 1">
                                 Automatic Placement
                             </button>
                             <button id="placement" class="btn btn-warning" @click="publishCommand(3)">

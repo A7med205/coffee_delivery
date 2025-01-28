@@ -7,7 +7,7 @@ var app = new Vue({
     logs: [],
     loading: false,
     interval: null,
-    rosbridge_address: 'wss://i-062c4ee243e87dd2f.robotigniteacademy.com/44a4395e-18d7-474d-98fc-dc5a1560534b/rosbridge/', // or your default
+    rosbridge_address: 'wss://i-0f6ba8ffe9f18a0a6.robotigniteacademy.com/823a2d48-6890-4641-88ea-aa9884185f5e/rosbridge/', // or your default
 
     // Publishers
     commandPub: null,
@@ -19,7 +19,8 @@ var app = new Vue({
 
     // Table & slots
     displayZero: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    displayData: [-0.455, -0.004, -0.385, -0.059,  -0.400, 0.050,  -0.516, -0.072,  -0.530, 0.034], // 10 floats from /display_
+     displayData: [-0.455, -0.004, -0.385, -0.059,  -0.400, 0.050,  -0.516, -0.072,  -0.530, 0.034],
+    // displayData: [0.0, 0.0, 0.0, 0.0,  0.0,0.0,  0.0, 0.0,  0.0, 0.0], // 10 floats from /display_
     tableRadiusPx: 100,
     slotRadiusPx: 20, 
     scale: 625,
@@ -60,20 +61,20 @@ var app = new Vue({
         this.commandPub = new ROSLIB.Topic({
           ros: this.ros,
           name: '/command_topic',
-          messageType: 'std_msgs/msg/Int32'
+          messageType: 'moveit2_scripts/msg/IntCommand'
         });
 
         this.posePub = new ROSLIB.Topic({
           ros: this.ros,
-          name: '/pose_topic',
-          messageType: 'std_msgs/msg/Float32MultiArray'
+          name: '/pos_topic',
+          messageType: 'moveit2_scripts/msg/PlacePos'
         });
 
         // Subscribe to /current_state
         const currentStateTopic = new ROSLIB.Topic({
           ros: this.ros,
           name: '/current_state',
-          messageType: 'std_msgs/msg/Int32'
+          messageType: 'moveit2_scripts/msg/IntCommand'
         });
         currentStateTopic.subscribe((msg) => {
           this.currentStateVal = msg.data;
@@ -87,7 +88,7 @@ var app = new Vue({
         const displayTopic = new ROSLIB.Topic({
           ros: this.ros,
           name: '/display_',
-          messageType: 'std_msgs/msg/Float32MultiArray'
+          messageType: 'moveit2_scripts/msg/DisplayPos'
         });
         displayTopic.subscribe((msg) => {
           if (msg.data.length === 10) {

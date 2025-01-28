@@ -24,6 +24,10 @@ find_package(tf2_ros REQUIRED)
 
 set(msg_files
   "msg/PickPlacePoses.msg"
+  "msg/PlacePos.msg"
+  "msg/IntCommand.msg"
+  "msg/IntState.msg"
+  "msg/DisplayPos.msg"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

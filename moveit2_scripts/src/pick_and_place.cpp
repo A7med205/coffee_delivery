@@ -111,7 +111,7 @@ private:
     bool success;
 
     // Moving Arm to the Pick Pose
-    move_group_->setPoseTarget(pick_pose);
+    /*move_group_->setPoseTarget(pick_pose);
     success =
         (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
 
@@ -121,7 +121,7 @@ private:
     } else {
       RCLCPP_WARN(LOGGER, "Failed to plan to pick pose.");
       return;
-    }
+    }*/
 
     // Opening the Gripper
     /*move_group_gripper_->setNamedTarget("open_gripper");
@@ -191,7 +191,7 @@ private:
     }*/
 
     // Moving arm to intermediatery pose
-    /* geometry_msgs::msg::Pose intermediatery_pose;
+    geometry_msgs::msg::Pose intermediatery_pose;
     intermediatery_pose.position.x = -0.334;
     intermediatery_pose.position.y = 0.057;
     intermediatery_pose.position.z = 0.403;
@@ -210,10 +210,10 @@ private:
       RCLCPP_INFO(LOGGER, "Arm moved to intermediatery pose.");
     } else {
       RCLCPP_WARN(LOGGER, "Failed to plan to intermediatery pose.");
-    } */
+    }
 
     // Moving arm to the place pose
-    /*move_group_->setPoseTarget(place_pose);
+    move_group_->setPoseTarget(place_pose);
     success =
         (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
 
@@ -222,7 +222,7 @@ private:
       RCLCPP_INFO(LOGGER, "Arm moved to place pose.");
     } else {
       RCLCPP_WARN(LOGGER, "Failed to plan to place pose.");
-    }*/
+    }
 
     // Opening the gripper
     /* move_group_gripper_->setNamedTarget("open_gripper");

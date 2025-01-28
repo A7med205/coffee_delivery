@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 import tf2_ros
 from geometry_msgs.msg import PointStamped
+from scipy.linalg import orthogonal_procrustes
 import tf2_geometry_msgs
 from rclpy.duration import Duration
 from sensor_msgs.msg import Image, CameraInfo
@@ -83,6 +84,40 @@ class TableSlotDetector(Node):
         except CvBridgeError as e:
             self.get_logger().error(f"CV Bridge Error (Depth): {e}")
             return
+
+    def transform_point(self, x, y):
+        # Define the measured and true points
+        measured_points = np.array([
+            [-0.385, -0.059],  # Point A
+            [-0.516, -0.072],  # Point C
+            [-0.530, 0.034],   # Point D
+        ])
+
+        true_points = np.array([
+            [-0.340, -0.043],  # Point A2
+            [-0.467, -0.039],  # Point C2
+            [-0.468, 0.067],   # Point D2
+        ])
+
+        # Calculate centroids
+        measured_centroid = np.mean(measured_points, axis=0)
+        true_centroid = np.mean(true_points, axis=0)
+        
+        # Center the points
+        measured_centered = measured_points - measured_centroid
+        true_centered = true_points - true_centroid
+        
+        # Find optimal rotation
+        rotation_matrix, _ = orthogonal_procrustes(measured_centered, true_centered)
+        
+        # Calculate translation
+        translation = true_centroid - (measured_centroid @ rotation_matrix)
+        
+        # Transform the input point
+        point = np.array([x, y])
+        transformed = (point @ rotation_matrix) + translation
+        
+        return transformed[0], transformed[1]
 
     def process_images(self):
         color_img = self.color_image.copy()
@@ -217,6 +252,9 @@ class TableSlotDetector(Node):
                 X_base = base_point.point.x
                 Y_base = base_point.point.y
                 Z_base = base_point.point.z
+
+                # Calibration
+                X_base, Y_base = self.transform_point(X_base, Y_base)
 
                 self.get_logger().info(
                     f"-> base_link coords=({X_base:.3f}, {Y_base:.3f}, {Z_base:.3f})"
