@@ -87,12 +87,12 @@ class TableSlotDetector(Node):
     def process_images(self):
         color_img = self.color_image.copy()
 
-        # Pre processing
+        # Convert to grayscale for brightness analysis and edge detection
         gray = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-        # Finding contours and fitting ellipses
-        edges = cv2.Canny(blurred, 50, 150)
+        # Find contours and fit ellipses
+        edges = cv2.Canny(blurred, 80, 200)
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         for contour in contours:
@@ -102,20 +102,64 @@ class TableSlotDetector(Node):
             ellipse = cv2.fitEllipse(contour)
             (x, y), (major_axis, minor_axis), angle = ellipse
 
-            # Filtering out unwanted ellipses by size
-            if minor_axis < 20 or major_axis < 20 or minor_axis > 30 or major_axis > 30:
+            # Compute brightness
+            mask = np.zeros_like(gray)
+            center_int = (int(round(x)), int(round(y)))
+            axes_int = (int(round(major_axis / 2.0)), int(round(minor_axis / 2.0)))
+
+            # Draw a filled ellipse on the mask
+            cv2.ellipse(
+                mask,
+                center_int,
+                axes_int,
+                angle,  # angle in degrees
+                0, 360,
+                color=255,
+                thickness=-1
+            )
+
+            # Extract all the grayscale values within that mask
+            ellipse_pixels = gray[mask == 255]
+            if len(ellipse_pixels) == 0:
+                # No valid pixels; skip
                 continue
 
-            # Drawing detected ellipses
+            mean_brightness = np.mean(ellipse_pixels)
+
+            # Decide size range
+            scale_factor = None
+
+            if (20 <= minor_axis <= 30 and 20 <= major_axis <= 30):
+                # Small range: 10% *larger* ellipse for depth
+                scale_factor = 1.10
+                
+                # Brightness filter
+                # if not (50 <= mean_brightness <= 100):
+                #     continue
+
+            elif (120 <= minor_axis <= 140 and 120 <= major_axis <= 140):
+                # Large range: 10% *smaller* ellipse for depth
+                scale_factor = 0.90
+
+                # Brightness filter
+                # if not (30 <= mean_brightness <= 80):
+                #     continue
+
+            # Size filter
+            if scale_factor is None:
+                continue
+
+            # Logging brightness
+            self.get_logger().info(f"Ellipse brightness (grayscale) = {mean_brightness:.2f}")
+
+            # Drawing the ellipse
             cv2.ellipse(color_img, ellipse, (0, 255, 0), 2)
 
-            # Find median depth around the scaled ellipse
-            scale_factor = 1.10  # 10% bigger ellipse
+            # Collecting depth values
             a = (major_axis * scale_factor) / 2.0
             b = (minor_axis * scale_factor) / 2.0
             angle_rad = np.deg2rad(angle)
 
-            # Sampling N points on the perimeter
             N = 360
             depth_values = []
             for i in range(N):
@@ -124,42 +168,43 @@ class TableSlotDetector(Node):
                 ex = a * math.cos(theta)
                 ey = b * math.sin(theta)
                 
-                # Rotating by angle_rad
+                # Rotate by angle_rad
                 x_rot = ex * math.cos(angle_rad) - ey * math.sin(angle_rad)
                 y_rot = ex * math.sin(angle_rad) + ey * math.cos(angle_rad)
                 
-                # Translating to pixel location
+                # Translate to pixel location
                 px = int(round(x + x_rot))
                 py = int(round(y + y_rot))
 
-                # Checking image resolution boundaries
+                # Check image boundaries
                 if (0 <= px < self.depth_image.shape[1] and 
                     0 <= py < self.depth_image.shape[0]):
                     Z = self.depth_image[py, px]
-                    Z = float(Z) / 1000.0 # Converting to meters
+                    Z = float(Z) / 1000.0  # Convert mm to meters
 
-                    # Checking if depth is valid
+                    # Append valid (non-zero, non-NaN) depth
                     if Z > 0 and not np.isnan(Z):
                         depth_values.append(Z)
 
             if len(depth_values) < 1:
-                continue # Skip if empty
+                continue  # no valid depth
 
             median_depth = np.median(depth_values)
 
-            # Converting the 2D center to 3D
+            # Convert 2D center (x,y) to 3D
             Z = float(median_depth)
             X = (x - self.cx) * Z / self.fx
             Y = (y - self.cy) * Z / self.fy
 
-            # Logging results
+            # Log the ellipse info
             self.get_logger().info(
                 f"Detected ellipse @ center=({x:.2f}, {y:.2f}), "
-                f"axes=({major_axis:.2f}, {minor_axis:.2f}), angle={angle:.2f} deg "
-                f"-> 3D coords=({X:.3f}, {Y:.3f}, {Z:.3f})"
+                f"axes=({major_axis:.2f}, {minor_axis:.2f}), angle={angle:.2f} deg, "
+                f"scale_factor={scale_factor} -> "
+                f"3D coords=({X:.3f}, {Y:.3f}, {Z:.3f})"
             )
 
-            # Converting to the arm's frame
+            # Transform to the arm's frame
             camera_point = PointStamped()
             camera_point.header.frame_id = 'D415_color_optical_frame'
             camera_point.header.stamp = self.get_clock().now().to_msg()
@@ -173,7 +218,9 @@ class TableSlotDetector(Node):
                 Y_base = base_point.point.y
                 Z_base = base_point.point.z
 
-                self.get_logger().info(f"-> base_link coords=({X_base:.3f}, {Y_base:.3f}, {Z_base:.3f})")
+                self.get_logger().info(
+                    f"-> base_link coords=({X_base:.3f}, {Y_base:.3f}, {Z_base:.3f})"
+                )
             except Exception as e:
                 self.get_logger().warn(f"Transform from D415_link to base_link failed: {e}")
 
