@@ -18,6 +18,7 @@ var app = new Vue({
     orderCount: 0,
 
     // Table & slots
+    displayZero: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     displayData: [-0.455, -0.004, -0.385, -0.059,  -0.400, 0.050,  -0.516, -0.072,  -0.530, 0.034], // 10 floats from /display_
     tableRadiusPx: 100,
     slotRadiusPx: 20, 
@@ -31,10 +32,14 @@ var app = new Vue({
     currentStateText() {
       switch (this.currentStateVal) {
         case 0: return 'Failed';
-        case 1: return 'home';
-        case 2: return 'moving to pick';
-        case 3: return 'moving to place';
-        case 4: return 'moving to home';
+        case 1: return 'Home';
+        case 2: return 'Pre Approach';
+        case 3: return 'Pre Grasp';
+        case 4: return 'Cup Grasped';
+        case 5: return 'Pick Pose';
+        case 6: return 'Intermediate Pose';
+        case 7: return 'Place Pose';
+        case 8: return 'Cup Placed';
         default: return 'unknown';
       }
     },
@@ -72,8 +77,8 @@ var app = new Vue({
         });
         currentStateTopic.subscribe((msg) => {
           this.currentStateVal = msg.data;
-          // If the new state is 3 => "moving to place", increment the orderCount
-          if (msg.data === 3) {
+          // If the new state is 8 => "Cup Placed", increment the orderCount
+          if (msg.data === 8) {
             this.orderCount++;
           }
         });
@@ -234,6 +239,8 @@ var app = new Vue({
               data: [rawX, rawY]
             });
             this.posePub.publish(msg);
+            this.displayData = this.displayZero;
+            this.drawSlots();
           }
           break;
         }
