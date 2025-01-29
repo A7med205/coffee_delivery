@@ -93,6 +93,7 @@ var app = new Vue({
         displayTopic.subscribe((msg) => {
           if (msg.data.length === 10) {
             this.displayData = msg.data;
+            this.logs.unshift((new Date()).toTimeString() + ' - Received display data.');
             this.drawSlots();
           }
         });

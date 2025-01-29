@@ -12,6 +12,8 @@ from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import numpy as np
 import math
+from moveit2_scripts.msg import IntCommand, DisplayPos
+
 
 class TableSlotDetector(Node):
     def __init__(self):
@@ -20,7 +22,7 @@ class TableSlotDetector(Node):
         # For the TF
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-        
+
         # Subscriptions
         self.camera_info_sub = self.create_subscription(
             CameraInfo,
@@ -41,6 +43,21 @@ class TableSlotDetector(Node):
             10
         )
 
+        # New subscriber for /command_topic
+        self.command_sub = self.create_subscription(
+            IntCommand,
+            '/command_topic',
+            self.command_callback,
+            10
+        )
+
+        # Publisher for /display_
+        self.display_pub = self.create_publisher(
+            DisplayPos,
+            '/display_',
+            10
+        )
+
         self.bridge = CvBridge()
 
         # Data
@@ -52,10 +69,12 @@ class TableSlotDetector(Node):
         self.cx = None
         self.cy = None
 
+        # Store the last integer command received
+        self.command_val = None
+
     def camera_info_callback(self, msg):
         """
-        Store camera intrinsic parameters and process images
-        (only if both color_image and depth_image are available).
+        Store camera intrinsic parameters but do NOT process images here.
         """
         self.camera_info = msg
 
@@ -64,12 +83,6 @@ class TableSlotDetector(Node):
         self.fy = msg.k[4]
         self.cx = msg.k[2]
         self.cy = msg.k[5]
-
-        # Processing images if all data is ready
-        if (self.color_image is not None and 
-            self.depth_image is not None and 
-            self.camera_info is not None):
-            self.process_images()
 
     def color_callback(self, msg):
         try:
@@ -85,8 +98,23 @@ class TableSlotDetector(Node):
             self.get_logger().error(f"CV Bridge Error (Depth): {e}")
             return
 
+    def command_callback(self, msg):
+        """
+        When a command is received on /command_topic, only process images
+        if the integer is 0 AND all the required data (color, depth, camera_info) is ready.
+        """
+        self.command_val = msg.data
+        self.get_logger().info(f"Received command: {self.command_val}")
+
+        if self.command_val == 0:
+            if (self.color_image is not None and
+                self.depth_image is not None and
+                self.camera_info is not None):
+                # Now we do the image processing
+                self.process_images()
+
     def transform_point(self, x, y):
-        # Define the measured and true points
+        # Defining the measured and true points
         measured_points = np.array([
             [-0.385, -0.059],  # Point A
             [-0.516, -0.072],  # Point C
@@ -99,36 +127,46 @@ class TableSlotDetector(Node):
             [-0.468, 0.067],   # Point D2
         ])
 
-        # Calculate centroids
+        # Calculating centroids
         measured_centroid = np.mean(measured_points, axis=0)
         true_centroid = np.mean(true_points, axis=0)
-        
-        # Center the points
+
+        # Centering the points
         measured_centered = measured_points - measured_centroid
         true_centered = true_points - true_centroid
-        
-        # Find optimal rotation
+
+        # Finding optimal rotation
         rotation_matrix, _ = orthogonal_procrustes(measured_centered, true_centered)
-        
-        # Calculate translation
+
+        # Calculating translation
         translation = true_centroid - (measured_centroid @ rotation_matrix)
-        
-        # Transform the input point
+
+        # Transforming the input point
         point = np.array([x, y])
         transformed = (point @ rotation_matrix) + translation
-        
+
         return transformed[0], transformed[1]
 
     def process_images(self):
+        """
+        Process color/depth images to find ellipses,
+        then publish the results to /display_ (DisplayPos).
+        This method is called only after receiving a 0 on /command_topic,
+        """
+
         color_img = self.color_image.copy()
 
         # Convert to grayscale for brightness analysis and edge detection
         gray = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-        # Find contours and fit ellipses
+        # Finding contours and fitting ellipses
         edges = cv2.Canny(blurred, 80, 200)
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Publisher data variables
+        last_large_ellipse_coords = None
+        small_ellipse_coords = []
 
         for contour in contours:
             if len(contour) < 5:
@@ -142,7 +180,7 @@ class TableSlotDetector(Node):
             center_int = (int(round(x)), int(round(y)))
             axes_int = (int(round(major_axis / 2.0)), int(round(minor_axis / 2.0)))
 
-            # Draw a filled ellipse on the mask
+            # Drawing a filled ellipse on the mask
             cv2.ellipse(
                 mask,
                 center_int,
@@ -153,44 +191,41 @@ class TableSlotDetector(Node):
                 thickness=-1
             )
 
-            # Extract all the grayscale values within that mask
             ellipse_pixels = gray[mask == 255]
             if len(ellipse_pixels) == 0:
-                # No valid pixels; skip
                 continue
 
             mean_brightness = np.mean(ellipse_pixels)
 
-            # Decide size range
             scale_factor = None
+            is_small = False
+            is_large = False
 
-            if (20 <= minor_axis <= 30 and 20 <= major_axis <= 30):
-                # Small range: 10% *larger* ellipse for depth
+            # Check size ranges
+            if 20 <= minor_axis <= 30 and 20 <= major_axis <= 30:
+                # Small ellipse
                 scale_factor = 1.10
-                
+                is_small = True
                 # Brightness filter
                 # if not (50 <= mean_brightness <= 100):
                 #     continue
-
-            elif (120 <= minor_axis <= 140 and 120 <= major_axis <= 140):
-                # Large range: 10% *smaller* ellipse for depth
+            elif 120 <= minor_axis <= 140 and 120 <= major_axis <= 140:
+                # Large ellipse
                 scale_factor = 0.90
-
+                is_large = True
                 # Brightness filter
-                # if not (30 <= mean_brightness <= 80):
+                # if not (50 <= mean_brightness <= 100):
                 #     continue
-
-            # Size filter
             if scale_factor is None:
-                continue
+                continue  # not in either size range
 
-            # Logging brightness
+            # Log brightness
             self.get_logger().info(f"Ellipse brightness (grayscale) = {mean_brightness:.2f}")
 
-            # Drawing the ellipse
+            # Draw ellipse outline
             cv2.ellipse(color_img, ellipse, (0, 255, 0), 2)
 
-            # Collecting depth values
+            # Collect depth values along the scaled ellipse
             a = (major_axis * scale_factor) / 2.0
             b = (minor_axis * scale_factor) / 2.0
             angle_rad = np.deg2rad(angle)
@@ -199,25 +234,21 @@ class TableSlotDetector(Node):
             depth_values = []
             for i in range(N):
                 theta = 2.0 * math.pi * i / N
-                # Parametric ellipse point (before rotation):
                 ex = a * math.cos(theta)
                 ey = b * math.sin(theta)
-                
-                # Rotate by angle_rad
+
+                # Rotate
                 x_rot = ex * math.cos(angle_rad) - ey * math.sin(angle_rad)
                 y_rot = ex * math.sin(angle_rad) + ey * math.cos(angle_rad)
-                
-                # Translate to pixel location
+
+                # Translate to pixel coords
                 px = int(round(x + x_rot))
                 py = int(round(y + y_rot))
 
                 # Check image boundaries
-                if (0 <= px < self.depth_image.shape[1] and 
+                if (0 <= px < self.depth_image.shape[1] and
                     0 <= py < self.depth_image.shape[0]):
-                    Z = self.depth_image[py, px]
-                    Z = float(Z) / 1000.0  # Convert mm to meters
-
-                    # Append valid (non-zero, non-NaN) depth
+                    Z = float(self.depth_image[py, px]) / 1000.0  # mm to meters
                     if Z > 0 and not np.isnan(Z):
                         depth_values.append(Z)
 
@@ -239,7 +270,7 @@ class TableSlotDetector(Node):
                 f"3D coords=({X:.3f}, {Y:.3f}, {Z:.3f})"
             )
 
-            # Transform to the arm's frame
+            # Transform to base_link
             camera_point = PointStamped()
             camera_point.header.frame_id = 'D415_color_optical_frame'
             camera_point.header.stamp = self.get_clock().now().to_msg()
@@ -253,18 +284,50 @@ class TableSlotDetector(Node):
                 Y_base = base_point.point.y
                 Z_base = base_point.point.z
 
-                # Calibration
+                # Apply final calibration transform
                 X_base, Y_base = self.transform_point(X_base, Y_base)
 
+                # Log coords in base_link
                 self.get_logger().info(
                     f"-> base_link coords=({X_base:.3f}, {Y_base:.3f}, {Z_base:.3f})"
                 )
+
+                # Storing publish data
+                if is_large:
+                    last_large_ellipse_coords = (X_base, Y_base)
+                if is_small and len(small_ellipse_coords) < 4:
+                    small_ellipse_coords.append((X_base, Y_base))
+
             except Exception as e:
-                self.get_logger().warn(f"Transform from D415_link to base_link failed: {e}")
+                self.get_logger().warn(f"Transform from D415_color_optical_frame to base_link failed: {e}")
 
         # Visualization
         cv2.imshow("Ellipse Detection", color_img)
         cv2.waitKey(1)
+
+        # Publish to /display_
+        display_msg = DisplayPos()
+        display_msg.data = [0.0] * 10
+
+        # Large ellipse coords
+        if last_large_ellipse_coords is not None:
+            display_msg.data[0] = float(last_large_ellipse_coords[0])
+            display_msg.data[1] = float(last_large_ellipse_coords[1])
+        else:
+            pass
+
+        # Small ellipse coords
+        for i, coords in enumerate(small_ellipse_coords):
+            if i >= 4:
+                break
+            base_index = 2 + 2*i
+            display_msg.data[base_index]   = float(coords[0])  # x
+            display_msg.data[base_index+1] = float(coords[1])  # y
+
+        # Publish
+        self.display_pub.publish(display_msg)
+        self.get_logger().info("Published DisplayPos message to /display_")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -272,6 +335,7 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
