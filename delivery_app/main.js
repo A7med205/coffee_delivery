@@ -34,13 +34,14 @@ var app = new Vue({
       switch (this.currentStateVal) {
         case 0: return 'Failed';
         case 1: return 'Home';
-        case 2: return 'Pre Approach';
-        case 3: return 'Pre Grasp';
-        case 4: return 'Cup Grasped';
-        case 5: return 'Pick Pose';
-        case 6: return 'Intermediate Pose';
-        case 7: return 'Place Pose';
-        case 8: return 'Cup Placed';
+        case 2: return 'Pick Pose';
+        case 3: return 'Pre Approach';
+        case 4: return 'Pre Grasp';
+        case 5: return 'Cup Grasped';
+        case 6: return 'Pick Pose 2';
+        case 7: return 'Intermediate Pose';
+        case 8: return 'Place Pose';
+        case 9: return 'Cup Placed';
         default: return 'unknown';
       }
     },
@@ -74,12 +75,12 @@ var app = new Vue({
         const currentStateTopic = new ROSLIB.Topic({
           ros: this.ros,
           name: '/current_state',
-          messageType: 'moveit2_scripts/msg/IntCommand'
+          messageType: 'moveit2_scripts/msg/IntState'
         });
         currentStateTopic.subscribe((msg) => {
           this.currentStateVal = msg.data;
-          // If the new state is 8 => "Cup Placed", increment the orderCount
-          if (msg.data === 8) {
+          // If the new state is 9 => "Cup Placed", increment the orderCount
+          if (msg.data === 9) {
             this.orderCount++;
           }
         });

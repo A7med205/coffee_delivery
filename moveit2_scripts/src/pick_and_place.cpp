@@ -1,11 +1,14 @@
+#include "rclcpp/publisher.hpp"
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/msg/display_robot_state.hpp>
 #include <moveit_msgs/msg/display_trajectory.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-// Custom message header
-#include <moveit2_scripts/msg/pick_place_poses.hpp>
+// Custom messages header
+#include <moveit2_scripts/msg/int_command>
+#include <moveit2_scripts/msg/int_state>
+#include <moveit2_scripts/msg/place_pos>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("pick_place_node");
 
@@ -13,19 +16,28 @@ static const rclcpp::Logger LOGGER = rclcpp::get_logger("pick_place_node");
 static const std::string PLANNING_GROUP = "manipulator";
 static const std::string PLANNING_GROUP_GRIPPER = "gripper";
 
+// Startup values
+cmd = Command::None;
+x_coord = y_coord = 0;
+
 class PickPlaceNode : public rclcpp::Node {
 public:
   PickPlaceNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
       : Node("pick_place_node", options) {
 
-    pick_place_sub_ =
-        this->create_subscription<moveit2_scripts::msg::PickPlacePoses>(
-            "pick_place_topic", 10,
-            std::bind(&PickPlaceNode::pick_place_callback, this,
-                      std::placeholders::_1));
+    // Subscribers
+    pick_place_sub_ = this->create_subscription<moveit2_scripts::msg::PlacePos>(
+        "/pick_place_topic", 10,
+        std::bind(&PickPlaceNode::pick_place_callback, this,
+                  std::placeholders::_1));
 
-    RCLCPP_INFO(LOGGER, "PickPlaceNode is ready and waiting for messages on "
-                        "'pick_place_topic'.");
+    command_sub_ = this->create_subscription<moveit2_scripts::msg::IntCommand>(
+        "command_topic", 10,
+        std::bind(&PickPlaceNode::command_callback, this,
+                  std::placeholders::_1));
+    // Publisher
+    state_pub = this->create_publisher<moveit2_scripts::msg::IntState>(
+        "/current_state", 10);
 
     // Initialize the PlanningSceneInterface here or wherever is convenient
     planning_scene_interface_ =
@@ -33,6 +45,9 @@ public:
 
     // Add the table box to the planning scene
     add_table_collision();
+
+    RCLCPP_INFO(LOGGER, "PickPlaceNode is ready and waiting for messages on "
+                        "'pick_place_topic'.");
   }
 
   void initialize_move_groups() {
@@ -73,7 +88,7 @@ private:
     table_pose.position.x = 0.3;
     table_pose.position.y = 0.36;
     table_pose.position.z = -0.05 / 2.0 - 0.005;
-    machine_pose.orientation.w = 1.0; // No rotation
+    machine_pose.orientation.w = 1.0;
     machine_pose.position.x = 0.3;
     machine_pose.position.y = 0.828;
     machine_pose.position.z = 0.225;
@@ -94,13 +109,38 @@ private:
     RCLCPP_INFO(LOGGER, "Added 'table' collision object to the world.");
   }
 
-  void pick_place_callback(
-      const moveit2_scripts::msg::PickPlacePoses::SharedPtr msg) {
-    RCLCPP_INFO(LOGGER, "Received a new pick-and-place request!");
+  void command_callback(const moveit2_scripts::msg::IntCommand::SharedPtr msg) {
+    RCLCPP_INFO(LOGGER, "Received new command");
+    // Automatic mode
+    if (msg->data == 1) {
+      cmd = Command::Pick_Pose;
+      incremental_ = false;
+      // Incremental mode
+    } else if (msg->data == 2) {
+      if (cmd == Command::None) {
+        cmd = Command::Pick_Pose;
+      }
+      incremental_ = true;
+      // Home
+    } else if (msg->data == 4) {
+      cmd = Command::Home;
+      incremental_ = false;
+    }
 
-    geometry_msgs::msg::Pose pick_pose = msg->pick_pose;
-    geometry_msgs::msg::Pose place_pose = msg->place_pose;
+    // Checking if coordinates are avilable
+    if (x_coord != 0 && y_coord != 0) {
+      arm_sequence();
+    }
+  }
 
+  void
+  pick_place_callback(const moveit2_scripts::msg::PlacePos::SharedPtr msg) {
+    RCLCPP_INFO(LOGGER, "Received new pick-and-place coordinates");
+    x_coord = msg->data[0];
+    y_coord = msg->data[1];
+  }
+
+  void arm_sequence() {
     // Ensuring the current state is our start state
     move_group_gripper_->setStartStateToCurrentState();
     move_group_->setStartStateToCurrentState();
@@ -110,154 +150,272 @@ private:
     moveit::planning_interface::MoveGroupInterface::Plan gripper_plan;
     bool success;
 
-    // Moving Arm to the Pick Pose
-    /*move_group_->setPoseTarget(pick_pose);
-    success =
-        (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+    // Publisher message
+    moveit2_scripts::msg::IntState state_msg;
 
-    if (success) {
-      move_group_->execute(plan);
-      RCLCPP_INFO(LOGGER, "Arm moved to pick pose.");
-    } else {
-      RCLCPP_WARN(LOGGER, "Failed to plan to pick pose.");
-      return;
-    }*/
+    while (cmd != Command::None) {
+      switch (cmd) {
+      case Command::Pick_Pose: {
+        // Moving Arm to the Pick Pose
+        geometry_msgs::msg::Pose pick_pose;
+        pick_pose.position.x = 0.212;
+        pick_pose.position.y = 0.346;
+        pick_pose.position.z = 0.352;
+        pick_pose.orientation.x = 1.0;
+        pick_pose.orientation.y = 0.0;
+        pick_pose.orientation.z = 0.0;
+        pick_pose.orientation.w = 0.0;
+        move_group_->setPoseTarget(pick_pose);
+        success =
+            (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
 
-    // Opening the Gripper
-    /*move_group_gripper_->setNamedTarget("open_gripper");
+        if (success) {
+          move_group_->execute(plan);
+          RCLCPP_INFO(LOGGER, "Arm moved to pick pose.");
+          state_msg.data = 2;
+          cmd = Command::Pre_Approach;
+        } else {
+          state_msg.data = 0;
+          cmd = Command::None;
+          RCLCPP_WARN(LOGGER, "Failed to plan to pick pose.");
+        }
+        break;
+      }
 
-    success = (move_group_gripper_->plan(gripper_plan) ==
-               moveit::core::MoveItErrorCode::SUCCESS);
+      case Command::Pre_Approach: {
+        // Opening the Gripper
+        move_group_gripper_->setNamedTarget("open_gripper");
 
-    if (success) {
-      move_group_gripper_->execute(gripper_plan);
-      RCLCPP_INFO(LOGGER, "Gripper opened.");
-    } else {
-      RCLCPP_WARN(LOGGER, "Failed to open gripper.");
-    }*/
+        success = (move_group_gripper_->plan(gripper_plan) ==
+                   moveit::core::MoveItErrorCode::SUCCESS);
 
-    // Cartesian approach
-    /*std::vector<geometry_msgs::msg::Pose> approach_waypoints;
-    // Moving down 3.5 cm
-    pick_pose.position.z -= 0.035;
-    approach_waypoints.push_back(pick_pose);
-    // Moving down another 3.5 cm
-    pick_pose.position.z -= 0.035;
-    approach_waypoints.push_back(pick_pose);
+        if (success) {
+          move_group_gripper_->execute(gripper_plan);
+          RCLCPP_INFO(LOGGER, "Gripper opened.");
+          state_msg.data = 3;
+          cmd = Command::Pre_Grasp;
+        } else {
+          state_msg.data = 0;
+          cmd = Command::None;
+          RCLCPP_WARN(LOGGER, "Failed to open gripper.");
+        }
+        break;
+      }
 
-    moveit_msgs::msg::RobotTrajectory approach_trajectory;
-    const double eef_step = 0.01;      // 1 cm resolution
-    const double jump_threshold = 0.0; // Disable jump threshold
-    double fraction = move_group_->computeCartesianPath(
-        approach_waypoints, eef_step, jump_threshold, approach_trajectory);
+      case Command::Pre_Grasp: {
+        // Cartesian approach
+        std::vector<geometry_msgs::msg::Pose> approach_waypoints;
+        // Moving down 3.5 cm
+        pick_pose.position.z -= 0.035;
+        approach_waypoints.push_back(pick_pose);
+        // Moving down another 3.5 cm
+        pick_pose.position.z -= 0.035;
+        approach_waypoints.push_back(pick_pose);
 
-    if (fraction > 0.0) {
-      move_group_->execute(approach_trajectory);
-      RCLCPP_INFO(LOGGER, "Approach successful.");
-    } else {
-      RCLCPP_WARN(LOGGER, "Approach path failed or partial. Fraction = %.2f",
-                  fraction);
-    }*/
+        moveit_msgs::msg::RobotTrajectory approach_trajectory;
+        const double eef_step = 0.01;      // 1 cm resolution
+        const double jump_threshold = 0.0; // Disable jump threshold
+        double fraction = move_group_->computeCartesianPath(
+            approach_waypoints, eef_step, jump_threshold, approach_trajectory);
 
-    // Closing the gripper
-    /*move_group_gripper_->setNamedTarget("close_gripper");
-    success = (move_group_gripper_->plan(gripper_plan) ==
-               moveit::core::MoveItErrorCode::SUCCESS);
+        if (fraction > 0.0) {
+          move_group_->execute(approach_trajectory);
+          RCLCPP_INFO(LOGGER, "Approach successful.");
+          state_msg.data = 4;
+          cmd = Command::Cup_Grasped;
+        } else {
+          state_msg.data = 0;
+          cmd = Command::None;
+          RCLCPP_WARN(LOGGER,
+                      "Approach path failed or partial. Fraction = %.2f",
+                      fraction);
+        }
+        break;
+      }
 
-    if (success) {
-      move_group_gripper_->execute(gripper_plan);
-      RCLCPP_INFO(LOGGER, "Gripper closed.");
-    } else {
-      RCLCPP_WARN(LOGGER, "Failed to close gripper.");
-    }*/
+      case Command::Cup_Grasped: {
+        // Closing the gripper
+        move_group_gripper_->setNamedTarget("close_gripper");
+        success = (move_group_gripper_->plan(gripper_plan) ==
+                   moveit::core::MoveItErrorCode::SUCCESS);
 
-    // Retreating
-    /* std::vector<geometry_msgs::msg::Pose> retreat_waypoints;
-    pick_pose.position.z += 0.04;
-    retreat_waypoints.push_back(pick_pose);
-    pick_pose.position.z += 0.04;
-    retreat_waypoints.push_back(pick_pose);
+        if (success) {
+          move_group_gripper_->execute(gripper_plan);
+          RCLCPP_INFO(LOGGER, "Gripper closed.");
+          state_msg.data = 5;
+          cmd = Command::Pick_Pose_2;
+        } else {
+          state_msg.data = 0;
+          cmd = Command::None;
+          RCLCPP_WARN(LOGGER, "Failed to close gripper.");
+        }
+        break;
+      }
 
-    moveit_msgs::msg::RobotTrajectory retreat_trajectory;
-    fraction = move_group_->computeCartesianPath(
-        retreat_waypoints, eef_step, jump_threshold, retreat_trajectory);
+      case Command::Pick_Pose_2: {
+        // Retreating
+        std::vector<geometry_msgs::msg::Pose> retreat_waypoints;
+        pick_pose.position.z += 0.04;
+        retreat_waypoints.push_back(pick_pose);
+        pick_pose.position.z += 0.04;
+        retreat_waypoints.push_back(pick_pose);
 
-    if (fraction > 0.0) {
-      move_group_->execute(retreat_trajectory);
-      RCLCPP_INFO(LOGGER, "Retreat successful.");
-    } else {
-      RCLCPP_WARN(LOGGER, "Retreat path failed or partial. Fraction = %.2f",
-                  fraction);
-    }*/
+        moveit_msgs::msg::RobotTrajectory retreat_trajectory;
+        fraction = move_group_->computeCartesianPath(
+            retreat_waypoints, eef_step, jump_threshold, retreat_trajectory);
 
-    // Moving arm to intermediatery pose
-    geometry_msgs::msg::Pose intermediatery_pose;
-    intermediatery_pose.position.x = -0.334;
-    intermediatery_pose.position.y = 0.057;
-    intermediatery_pose.position.z = 0.403;
-    intermediatery_pose.orientation.x = 1.0;
-    intermediatery_pose.orientation.y = 0.0;
-    intermediatery_pose.orientation.z = 0.0;
-    intermediatery_pose.orientation.w = 0.0;
+        if (fraction > 0.0) {
+          move_group_->execute(retreat_trajectory);
+          RCLCPP_INFO(LOGGER, "Retreat successful.");
+          state_msg.data = 6;
+          cmd = Command::Intermediate_Pose;
+        } else {
+          state_msg.data = 0;
+          cmd = Command::None;
+          RCLCPP_WARN(LOGGER, "Retreat path failed or partial. Fraction = %.2f",
+                      fraction);
+        }
+        break;
+      }
 
-    // Set the intermediatery pose as the target
-    move_group_->setPoseTarget(intermediatery_pose);
-    success =
-        (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+      case Command::Intermediate_Pose: {
+        // Moving arm to intermediatery pose
+        geometry_msgs::msg::Pose intermediatery_pose;
+        intermediatery_pose.position.x = -0.334;
+        intermediatery_pose.position.y = 0.057;
+        intermediatery_pose.position.z = 0.403;
+        intermediatery_pose.orientation.x = 1.0;
+        intermediatery_pose.orientation.y = 0.0;
+        intermediatery_pose.orientation.z = 0.0;
+        intermediatery_pose.orientation.w = 0.0;
 
-    if (success) {
-      move_group_->execute(plan);
-      RCLCPP_INFO(LOGGER, "Arm moved to intermediatery pose.");
-    } else {
-      RCLCPP_WARN(LOGGER, "Failed to plan to intermediatery pose.");
+        // Set the intermediatery pose as the target
+        move_group_->setPoseTarget(intermediatery_pose);
+        success =
+            (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
+        if (success) {
+          move_group_->execute(plan);
+          RCLCPP_INFO(LOGGER, "Arm moved to intermediatery pose.");
+          state_msg.data = 7;
+          cmd = Command::Place_Pose;
+        } else {
+          state_msg.data = 0;
+          cmd = Command::None;
+          RCLCPP_WARN(LOGGER, "Failed to plan to intermediatery pose.");
+        }
+        break;
+      }
+
+      case Command::Place_Pose: {
+        // Moving arm to the place pose
+        geometry_msgs::msg::Pose place_pose;
+        place_pose.position.x = x_coord;
+        place_pose.position.y = y_coord;
+        place_pose.position.z = -0.110;
+        place_pose.orientation.x = 1.0;
+        place_pose.orientation.y = 0.0;
+        place_pose.orientation.z = 0.0;
+        place_pose.orientation.w = 0.0;
+        move_group_->setPoseTarget(place_pose);
+        success =
+            (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
+        if (success) {
+          move_group_->execute(plan);
+          RCLCPP_INFO(LOGGER, "Arm moved to place pose.");
+          state_msg.data = 8;
+          cmd = Command::Cup_Placed;
+        } else {
+          state_msg.data = 0;
+          cmd = Command::None;
+          RCLCPP_WARN(LOGGER, "Failed to plan to place pose.");
+        }
+        break;
+      }
+
+      case Command::Cup_Placed: {
+        // Opening the gripper
+        move_group_gripper_->setNamedTarget("open_gripper");
+        success = (move_group_gripper_->plan(gripper_plan) ==
+                   moveit::core::MoveItErrorCode::SUCCESS);
+
+        if (success) {
+          move_group_gripper_->execute(gripper_plan);
+          RCLCPP_INFO(LOGGER, "Pick-and-place sequence completed.");
+          state_msg.data = 9;
+          cmd = Command::Home;
+        } else {
+          state_msg.data = 0;
+          cmd = Command::None;
+          RCLCPP_WARN(LOGGER, "Failed to open gripper.");
+        }
+        break;
+      }
+
+      case Command::Home: {
+        // Returning to home
+        move_group_->setNamedTarget("home");
+        success =
+            (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
+        if (success) {
+          move_group_->execute(plan);
+          RCLCPP_INFO(LOGGER, "Returned to home.");
+          state_msg.data = 1;
+          cmd = Command::None;
+        } else {
+          state_msg.data = 0;
+          cmd = Command::None;
+          RCLCPP_WARN(LOGGER, "Failed to return to home.");
+        }
+        break;
+      }
+
+      default:
+        break;
+      }
+
+      state_pub->publish(state_msg); // Publishing
+
+      // Interrupting if in incremental mode
+      if (incremental_) {
+        break;
+      }
     }
 
-    // Moving arm to the place pose
-    move_group_->setPoseTarget(place_pose);
-    success =
-        (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
-
-    if (success) {
-      move_group_->execute(plan);
-      RCLCPP_INFO(LOGGER, "Arm moved to place pose.");
-    } else {
-      RCLCPP_WARN(LOGGER, "Failed to plan to place pose.");
+    if (cmd == Command::None) {
+      x_coord = y_coord = 0; // Resetting coordinates
     }
-
-    // Opening the gripper
-    /* move_group_gripper_->setNamedTarget("open_gripper");
-    success = (move_group_gripper_->plan(gripper_plan) ==
-               moveit::core::MoveItErrorCode::SUCCESS);
-
-    if (success) {
-      move_group_gripper_->execute(gripper_plan);
-      RCLCPP_INFO(LOGGER, "Gripper opened.");
-    } else {
-      RCLCPP_WARN(LOGGER, "Failed to open gripper.");
-    }*/
-
-    // Returning to home
-    /*move_group_->setNamedTarget("home");
-    success =
-        (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
-
-    if (success) {
-      move_group_->execute(plan);
-      RCLCPP_INFO(LOGGER, "Returned to home.");
-    } else {
-      RCLCPP_WARN(LOGGER, "Failed to return to home.");
-    } */
-
-    RCLCPP_INFO(LOGGER, "Pick-and-place sequence completed!");
   }
 
-  rclcpp::Subscription<moveit2_scripts::msg::PickPlacePoses>::SharedPtr
+  rclcpp::Subscription<moveit2_scripts::msg::PlacePos>::SharedPtr
       pick_place_sub_;
+  rclcpp::Subscription<moveit2_scripts::msg::IntCommand>::SharedPtr
+      command_sub_;
+  rclcpp::Publisher<moveit2_scripts::msg::IntState>::SharedPtr state_pub;
+
   std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
       planning_scene_interface_;
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface> move_group_;
   std::shared_ptr<moveit::planning_interface::MoveGroupInterface>
       move_group_gripper_;
+
+  enum class Command {
+    None,
+    Home,
+    Pick_Pose,
+    Pre_Approach,
+    Pre_Grasp,
+    Cup_Grasped,
+    Pick_Pose_2,
+    Intermediate_Pose,
+    Place_Pose,
+    Cup_Placed
+  };
+  Command cmd;
+  double x_coord, y_coord;
+  bool incremental_;
 };
 
 int main(int argc, char **argv) {
