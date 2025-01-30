@@ -80,8 +80,8 @@ var app = new Vue({
         currentStateTopic.subscribe((msg) => {
           this.currentStateVal = msg.data;
           this.logs.unshift(`${(new Date()).toTimeString()} - New state: ${msg.data}`);
-          // If the new state is 9 => "Cup Placed", increment the orderCount
-          if (msg.data === 9) {
+          // If the new state is 8 => "Place Pose", increment the orderCount
+          if (msg.data === 8) {
             this.orderCount++;
           }
         });
