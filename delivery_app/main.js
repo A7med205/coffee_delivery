@@ -7,7 +7,7 @@ var app = new Vue({
     logs: [],
     loading: false,
     interval: null,
-    rosbridge_address: 'wss://i-0f6ba8ffe9f18a0a6.robotigniteacademy.com/823a2d48-6890-4641-88ea-aa9884185f5e/rosbridge/', // or your default
+    rosbridge_address: 'wss://i-027d7ef9ca4b64a53.robotigniteacademy.com/2b63868f-6024-4fe0-9ef7-0ba85952d9af/rosbridge/', // or your default
 
     // Publishers
     commandPub: null,
@@ -19,7 +19,7 @@ var app = new Vue({
 
     // Table & slots
     displayZero: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-     displayData: [-0.455, -0.004, -0.385, -0.059,  -0.400, 0.050,  -0.516, -0.072,  -0.530, 0.034],
+     displayData: [-0.400, -0.00, -0.338, -0.044, -0.337, 0.066, -0.468, -0.039, -0.468, 0.069],
     // displayData: [0.0, 0.0, 0.0, 0.0,  0.0,0.0,  0.0, 0.0,  0.0, 0.0], // 10 floats from /display_
     tableRadiusPx: 100,
     slotRadiusPx: 20, 
@@ -79,6 +79,7 @@ var app = new Vue({
         });
         currentStateTopic.subscribe((msg) => {
           this.currentStateVal = msg.data;
+          this.logs.unshift(`${(new Date()).toTimeString()} - New state: ${msg.data}`);
           // If the new state is 9 => "Cup Placed", increment the orderCount
           if (msg.data === 9) {
             this.orderCount++;

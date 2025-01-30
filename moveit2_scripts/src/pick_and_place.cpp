@@ -6,19 +6,15 @@
 #include <rclcpp/rclcpp.hpp>
 
 // Custom messages header
-#include <moveit2_scripts/msg/int_command>
-#include <moveit2_scripts/msg/int_state>
-#include <moveit2_scripts/msg/place_pos>
+#include <moveit2_scripts/msg/int_command.hpp>
+#include <moveit2_scripts/msg/int_state.hpp>
+#include <moveit2_scripts/msg/place_pos.hpp>
 
 static const rclcpp::Logger LOGGER = rclcpp::get_logger("pick_place_node");
 
 // Planning group names
 static const std::string PLANNING_GROUP = "manipulator";
 static const std::string PLANNING_GROUP_GRIPPER = "gripper";
-
-// Startup values
-cmd = Command::None;
-x_coord = y_coord = 0;
 
 class PickPlaceNode : public rclcpp::Node {
 public:
@@ -27,7 +23,7 @@ public:
 
     // Subscribers
     pick_place_sub_ = this->create_subscription<moveit2_scripts::msg::PlacePos>(
-        "/pick_place_topic", 10,
+        "/pos_topic", 10,
         std::bind(&PickPlaceNode::pick_place_callback, this,
                   std::placeholders::_1));
 
@@ -45,6 +41,10 @@ public:
 
     // Add the table box to the planning scene
     add_table_collision();
+
+    // Startup values
+    cmd = Command::None;
+    x_coord = y_coord = 0;
 
     RCLCPP_INFO(LOGGER, "PickPlaceNode is ready and waiting for messages on "
                         "'pick_place_topic'.");
@@ -130,6 +130,8 @@ private:
     // Checking if coordinates are avilable
     if (x_coord != 0 && y_coord != 0) {
       arm_sequence();
+    } else {
+      RCLCPP_INFO(LOGGER, "No coordinates avilable");
     }
   }
 
@@ -150,6 +152,29 @@ private:
     moveit::planning_interface::MoveGroupInterface::Plan gripper_plan;
     bool success;
 
+    // Setting pick and itermediatery poses
+    geometry_msgs::msg::Pose pick_pose;
+    pick_pose.position.x = 0.212;
+    pick_pose.position.y = 0.346;
+    pick_pose.position.z = 0.352;
+    pick_pose.orientation.x = 1.0;
+    pick_pose.orientation.y = 0.0;
+    pick_pose.orientation.z = 0.0;
+    pick_pose.orientation.w = 0.0;
+
+    geometry_msgs::msg::Pose intermediatery_pose;
+    intermediatery_pose.position.x = -0.334;
+    intermediatery_pose.position.y = 0.057;
+    intermediatery_pose.position.z = 0.403;
+    intermediatery_pose.orientation.x = 1.0;
+    intermediatery_pose.orientation.y = 0.0;
+    intermediatery_pose.orientation.z = 0.0;
+    intermediatery_pose.orientation.w = 0.0;
+
+    // Cartesian approach/retreat parameters
+    const double eef_step = 0.01;      // 1 cm resolution
+    const double jump_threshold = 0.0; // Disable jump threshold
+
     // Publisher message
     moveit2_scripts::msg::IntState state_msg;
 
@@ -157,14 +182,6 @@ private:
       switch (cmd) {
       case Command::Pick_Pose: {
         // Moving Arm to the Pick Pose
-        geometry_msgs::msg::Pose pick_pose;
-        pick_pose.position.x = 0.212;
-        pick_pose.position.y = 0.346;
-        pick_pose.position.z = 0.352;
-        pick_pose.orientation.x = 1.0;
-        pick_pose.orientation.y = 0.0;
-        pick_pose.orientation.z = 0.0;
-        pick_pose.orientation.w = 0.0;
         move_group_->setPoseTarget(pick_pose);
         success =
             (move_group_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
@@ -213,8 +230,6 @@ private:
         approach_waypoints.push_back(pick_pose);
 
         moveit_msgs::msg::RobotTrajectory approach_trajectory;
-        const double eef_step = 0.01;      // 1 cm resolution
-        const double jump_threshold = 0.0; // Disable jump threshold
         double fraction = move_group_->computeCartesianPath(
             approach_waypoints, eef_step, jump_threshold, approach_trajectory);
 
@@ -235,7 +250,7 @@ private:
 
       case Command::Cup_Grasped: {
         // Closing the gripper
-        move_group_gripper_->setNamedTarget("close_gripper");
+        move_group_gripper_->setNamedTarget("close_gripper -0.2");
         success = (move_group_gripper_->plan(gripper_plan) ==
                    moveit::core::MoveItErrorCode::SUCCESS);
 
@@ -255,13 +270,13 @@ private:
       case Command::Pick_Pose_2: {
         // Retreating
         std::vector<geometry_msgs::msg::Pose> retreat_waypoints;
-        pick_pose.position.z += 0.04;
+        pick_pose.position.z += 0.035;
         retreat_waypoints.push_back(pick_pose);
-        pick_pose.position.z += 0.04;
+        pick_pose.position.z += 0.035;
         retreat_waypoints.push_back(pick_pose);
 
         moveit_msgs::msg::RobotTrajectory retreat_trajectory;
-        fraction = move_group_->computeCartesianPath(
+        double fraction = move_group_->computeCartesianPath(
             retreat_waypoints, eef_step, jump_threshold, retreat_trajectory);
 
         if (fraction > 0.0) {
@@ -280,15 +295,6 @@ private:
 
       case Command::Intermediate_Pose: {
         // Moving arm to intermediatery pose
-        geometry_msgs::msg::Pose intermediatery_pose;
-        intermediatery_pose.position.x = -0.334;
-        intermediatery_pose.position.y = 0.057;
-        intermediatery_pose.position.z = 0.403;
-        intermediatery_pose.orientation.x = 1.0;
-        intermediatery_pose.orientation.y = 0.0;
-        intermediatery_pose.orientation.z = 0.0;
-        intermediatery_pose.orientation.w = 0.0;
-
         // Set the intermediatery pose as the target
         move_group_->setPoseTarget(intermediatery_pose);
         success =
