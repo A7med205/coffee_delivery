@@ -206,16 +206,16 @@ class TableSlotDetector(Node):
                 # Small ellipse
                 scale_factor = 1.10
                 is_small = True
-                # Brightness filter
-                # if not (50 <= mean_brightness <= 100):
-                #     continue
+                #Brightness filter
+                if not (30 <= mean_brightness <= 100):
+                    continue
             elif 120 <= minor_axis <= 140 and 120 <= major_axis <= 140:
                 # Large ellipse
                 scale_factor = 0.90
                 is_large = True
-                # Brightness filter
-                # if not (50 <= mean_brightness <= 100):
-                #     continue
+                #Brightness filter
+                if not (150 <= mean_brightness <= 200):
+                    continue
             if scale_factor is None:
                 continue  # not in either size range
 

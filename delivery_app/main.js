@@ -7,7 +7,7 @@ var app = new Vue({
     logs: [],
     loading: false,
     interval: null,
-    rosbridge_address: 'wss://i-027d7ef9ca4b64a53.robotigniteacademy.com/2b63868f-6024-4fe0-9ef7-0ba85952d9af/rosbridge/', // or your default
+    rosbridge_address: 'wss://i-0561522e831c667fb.robotigniteacademy.com/4a0f1d03-5f17-45a9-a656-6dfee7dc3e3d/rosbridge/', // or your default
 
     // Publishers
     commandPub: null,
@@ -19,8 +19,8 @@ var app = new Vue({
 
     // Table & slots
     displayZero: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-     displayData: [-0.400, -0.00, -0.338, -0.044, -0.337, 0.066, -0.468, -0.039, -0.468, 0.069],
-    // displayData: [0.0, 0.0, 0.0, 0.0,  0.0,0.0,  0.0, 0.0,  0.0, 0.0], // 10 floats from /display_
+    // displayData: [-0.404, -0.005, -0.338, -0.044, -0.337, 0.066, -0.468, -0.039, -0.468, 0.069],
+    displayData: [0.0, 0.0, 0.0, 0.0,  0.0,0.0,  0.0, 0.0,  0.0, 0.0], // 10 floats from /display_
     tableRadiusPx: 100,
     slotRadiusPx: 20, 
     scale: 625,
