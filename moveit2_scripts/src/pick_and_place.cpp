@@ -21,16 +21,38 @@ public:
   PickPlaceNode(const rclcpp::NodeOptions &options = rclcpp::NodeOptions())
       : Node("pick_place_node", options) {
 
+    // Callback_groups
+    callback_group_main_ = this->create_callback_group(
+        rclcpp::CallbackGroupType::MutuallyExclusive);
+    callback_group_stop_check_ = this->create_callback_group(
+        rclcpp::CallbackGroupType::MutuallyExclusive);
+
+    // Options
+    rclcpp::SubscriptionOptions sub_options_main;
+    sub_options_main.callback_group = callback_group_main_;
+    rclcpp::SubscriptionOptions sub_options_stop_check;
+    sub_options_stop_check.callback_group = callback_group_stop_check_;
+
     // Subscribers
     pick_place_sub_ = this->create_subscription<moveit2_scripts::msg::PlacePos>(
         "/pos_topic", 10,
         std::bind(&PickPlaceNode::pick_place_callback, this,
-                  std::placeholders::_1));
+                  std::placeholders::_1),
+        sub_options_main);
 
     command_sub_ = this->create_subscription<moveit2_scripts::msg::IntCommand>(
-        "command_topic", 10,
+        "/command_topic", 10,
         std::bind(&PickPlaceNode::command_callback, this,
-                  std::placeholders::_1));
+                  std::placeholders::_1),
+        sub_options_main);
+
+    stop_check_sub_ =
+        this->create_subscription<moveit2_scripts::msg::IntCommand>(
+            "/command_topic", 10,
+            std::bind(&PickPlaceNode::stop_check_callback, this,
+                      std::placeholders::_1),
+            sub_options_stop_check);
+
     // Publisher
     state_pub = this->create_publisher<moveit2_scripts::msg::IntState>(
         "/current_state", 10);
@@ -121,10 +143,12 @@ private:
         cmd = Command::Pick_Pose;
       }
       incremental_ = true;
-      // Home
+      // Open gripper and return to home
     } else if (msg->data == 4) {
-      cmd = Command::Home;
+      cmd = Command::Cup_Placed;
       incremental_ = false;
+      arm_sequence();
+      return;
     }
 
     // Checking if coordinates are avilable
@@ -132,6 +156,16 @@ private:
       arm_sequence();
     } else {
       RCLCPP_INFO(LOGGER, "No coordinates avilable");
+    }
+  }
+
+  void
+  stop_check_callback(const moveit2_scripts::msg::IntCommand::SharedPtr msg) {
+    // Stop system
+    if (msg->data == 3) {
+      RCLCPP_WARN(LOGGER,
+                  "Zero-check subscriber: Switching to incremental mode");
+      incremental_ = true;
     }
   }
 
@@ -399,7 +433,13 @@ private:
       pick_place_sub_;
   rclcpp::Subscription<moveit2_scripts::msg::IntCommand>::SharedPtr
       command_sub_;
+  rclcpp::Subscription<moveit2_scripts::msg::IntCommand>::SharedPtr
+      stop_check_sub_;
   rclcpp::Publisher<moveit2_scripts::msg::IntState>::SharedPtr state_pub;
+
+  // Callback groups
+  rclcpp::CallbackGroup::SharedPtr callback_group_main_;
+  rclcpp::CallbackGroup::SharedPtr callback_group_stop_check_;
 
   std::shared_ptr<moveit::planning_interface::PlanningSceneInterface>
       planning_scene_interface_;
@@ -428,7 +468,10 @@ int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<PickPlaceNode>();
   node->initialize_move_groups(); // Initializing move groups
-  rclcpp::spin(node);
+
+  auto executor = std::make_shared<rclcpp::executors::MultiThreadedExecutor>();
+  executor->add_node(node);
+  executor->spin();
   rclcpp::shutdown();
   return 0;
 }
