@@ -214,7 +214,7 @@ class TableSlotDetector(Node):
                 scale_factor = 0.90
                 is_large = True
                 #Brightness filter
-                if not (150 <= mean_brightness <= 200):
+                if not (100 <= mean_brightness <= 200):
                     continue
             if scale_factor is None:
                 continue  # not in either size range

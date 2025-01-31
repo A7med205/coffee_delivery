@@ -20,7 +20,7 @@ var app = new Vue({
     // Table & slots
     displayZero: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     // displayData: [-0.404, -0.005, -0.338, -0.044, -0.337, 0.066, -0.468, -0.039, -0.468, 0.069],
-    displayData: [0.0, 0.0, 0.0, 0.0,  0.0,0.0,  0.0, 0.0,  0.0, 0.0], // 10 floats from /display_
+    displayData: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], // 10 floats from /display_
     tableRadiusPx: 100,
     slotRadiusPx: 20, 
     scale: 625,
