@@ -22,8 +22,7 @@ The cup slots need to be within the URe3 robot's reach and should be visible by 
   python3-pip
   ros-humble-cv-bridge
   ros-humble-rosbridge-server
-	numpy 1.24.*
-	### last numpy version below 1.25
+  numpy 1.24.* ### last numpy version below 1.25
 ```
 Note: you can run rosdep after cloning the package to identify any missing dependencies 
 
@@ -66,14 +65,17 @@ ros2 topic pub -1 /display_ moveit2_scripts/msg/DisplayPos "{data: [-0.404, -0.0
 - Only available slots are visible
 - Control buttons won't work without sending coordinates first
 - Coordinates are reset after every sequence that ends with returning to home
+
 **Home button:**
 - The home button opens the gripper and returns to the home position
 - It's a good idea to enforce the home position at start-up
+
 **Automatic Mode:**
 - Automatic mode completes the pick and place sequence from start to finish after selecting a slot
+
 **Stop Button:**
 - The stop button has a dedicated subscriber running on a separate thread in the manipulation node
 - Doesn't interrupt step, only switches to incremental mode
+
 **Incremental Mode:**
 - Incremental button completes the sequence one step at a time
-- Does not initiate the process
