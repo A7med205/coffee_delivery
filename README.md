@@ -1,8 +1,8 @@
 ## Description
 
-The coffee_delivery package automates the handing of coffee cups from the counter to the barista delivery robot, using computer vision for guidance.
+The coffee_delivery package automates the handing of coffee cups from the counter to the barista delivery robot entirely using computer vision for guidance, the cup slots just need to be within the URe3 robot's reach and should be visible by the RGB-D camera.
 
-The cup slots need to be within the URe3 robot's reach and should be visible by the RGB-D camera.
+![](https://github.com/A7med205/coffee_delivery/blob/main/media/Incremental.gif)
 
 ---
 ## Dependencies
@@ -61,7 +61,6 @@ ros2 topic pub -1 /display_ moveit2_scripts/msg/DisplayPos "{data: [-0.404, -0.0
 
 **Incremental Mode:**
 - Incremental button completes the sequence one step at a time
-![](https://github.com/A7med205/coffee_delivery/blob/main/media/Incremental.gif)
 
 **Automatic Mode:**
 - Automatic mode completes the pick and place sequence from start to finish after selecting a slot
