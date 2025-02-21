@@ -70,17 +70,14 @@ ros2 topic pub -1 /display_ moveit2_scripts/msg/DisplayPos "{data: [-0.404, -0.0
 **Home button:**
 - The home button opens the gripper and returns to the home position
 - It's a good idea to enforce the home position at start-up
-![](https://github.com/A7med205/coffee_delivery/blob/main/media/Home.gif)
-
-**Automatic Mode:**
-- Automatic mode completes the pick and place sequence from start to finish after selecting a slot
-![](https://github.com/A7med205/coffee_delivery/blob/main/media/Auto.gif)
-
-**Stop Button:**
-- The stop button has a dedicated subscriber running on a separate thread in the manipulation node
-- Doesn't interrupt step, only switches to incremental mode
-![](https://github.com/A7med205/coffee_delivery/blob/main/media/Stop.gif)
 
 **Incremental Mode:**
 - Incremental button completes the sequence one step at a time
 ![](https://github.com/A7med205/coffee_delivery/blob/main/media/Incremental.gif)
+
+**Automatic Mode:**
+- Automatic mode completes the pick and place sequence from start to finish after selecting a slot
+- 
+**Stop Button:**
+- The stop button has a dedicated subscriber running on a separate thread in the manipulation node
+- Doesn't interrupt step, only switches to incremental mode
