@@ -5,21 +5,10 @@ The coffee_delivery package automates the handing of coffee cups from the counte
 The cup slots need to be within the URe3 robot's reach and should be visible by the RGB-D camera.
 
 ---
-## Main Dependencies
+## Dependencies
 
 ```
-  ros-humble-joint-state-publisher
-  ros-humble-robot-state-publisher
-  ros-humble-joint-state-publisher-gui
-  ros-humble-controller-manager
-  ros-humble-ur-description
-  ros-humble-xacro
-  ros-humble-moveit
-  ros-humble-urdf
-  python3
   python3-opencv
-  python3-rosdep
-  python3-pip
   ros-humble-cv-bridge
   ros-humble-rosbridge-server
   numpy 1.24.* ### last numpy version below 1.25
