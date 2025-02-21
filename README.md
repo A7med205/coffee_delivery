@@ -65,7 +65,6 @@ ros2 topic pub -1 /display_ moveit2_scripts/msg/DisplayPos "{data: [-0.404, -0.0
 - Only available slots are visible
 - Control buttons won't work without sending coordinates first
 - Coordinates are reset after every sequence that ends with returning to home
-![](https://github.com/A7med205/coffee_delivery/blob/main/media/Detection.gif)
 
 **Home button:**
 - The home button opens the gripper and returns to the home position
